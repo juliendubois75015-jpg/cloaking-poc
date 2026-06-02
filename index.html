@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Test Cloaking - Pattern JIFSAN</title>
+  <style>
+    body { font-family: Arial; padding: 40px; background: #f5f5f5; }
+    .box { background: white; border-radius: 8px; padding: 30px; max-width: 600px; margin: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .normal { background: #e8f5e9; border-left: 5px solid #4caf50; padding: 20px; border-radius: 4px; }
+    .redirect { background: #fff3e0; border-left: 5px solid #ff9800; padding: 20px; border-radius: 4px; }
+    .countdown { font-size: 24px; font-weight: bold; color: #e53935; }
+    pre { background: #263238; color: #aed581; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 13px; }
+  </style>
+</head>
+<body>
+<div class="box">
+  <h2>🔬 Test du mécanisme de cloaking</h2>
+  <div id="result">Analyse en cours...</div>
+
+  <hr style="margin:30px 0"/>
+  <h3>Code exécuté (identique à ga.php de 1edu.xyz)</h3>
+  <pre id="code_display"></pre>
+
+  <h3>Valeurs détectées</h3>
+  <ul>
+    <li><strong>document.referrer :</strong> <span id="ref_val"></span></li>
+    <li><strong>Paramètre ?p= :</strong> <span id="param_val"></span></li>
+    <li><strong>window.location.href :</strong> <span id="url_val"></span></li>
+  </ul>
+</div>
+
+<script>
+// ================================================================
+// EXACTEMENT le code de share.1edu.xyz/wcpt.js + ga.php réunis
+// ================================================================
+
+// --- wcpt.js (détection param ?p=) ---
+var urlParams = new URLSearchParams(window.location.search);
+var hasParam = urlParams.has('p') || urlParams.has('app') || urlParams.has('product');
+
+// Afficher les valeurs détectées
+document.getElementById('ref_val').textContent = document.referrer || '(aucun - visite directe)';
+document.getElementById('param_val').textContent = urlParams.get('p') || '(absent)';
+document.getElementById('url_val').textContent = window.location.href;
+
+document.getElementById('code_display').textContent =
+  "// wcpt.js\n" +
+  "if (urlParams.has('p')) { charger ga.php }\n\n" +
+  "// ga.php\n" +
+  "if (referrer contient 'google.') {\n" +
+  "    window.location = 'https://aff.1edu.xyz/go.php?ref=' + URL\n" +
+  "} else {\n" +
+  "    // rien — page normale\n" +
+  "}";
+
+// --- ga.php (logique cloaking) ---
+if (hasParam) {
+  var referrer = document.referrer;
+
+  var fromSearchEngine = (
+    (referrer.indexOf('google.') > 0 && referrer.indexOf('corp.google.com') === -1) ||
+    referrer.indexOf('duckduckgo.com') > 0 ||
+    referrer.indexOf('bing.com') > 0 ||
+    referrer.indexOf('yahoo.com') > 0
+  );
+
+  // Pour ce test : on simule aussi un "referrer Google" via ?ref=google
+  var simulatedGoogle = urlParams.get('ref') === 'google';
+
+  if (fromSearchEngine || simulatedGoogle) {
+    // ===== CAS 1 : visiteur venant d'un moteur → REDIRECT =====
+    var countdown = 3;
+    document.getElementById('result').innerHTML =
+      '<div class="redirect">' +
+      '<h2>🚨 REDIRECT DÉCLENCHÉ</h2>' +
+      '<p>Le visiteur vient de <strong>' + (simulatedGoogle ? 'Google (simulé via ?ref=google)' : referrer) + '</strong></p>' +
+      '<p>Dans le vrai système → redirige vers <strong>aff.1edu.xyz/go.php</strong> → ClickBank → produit affilié</p>' +
+      '<p>Dans ce test → redirige vers <strong>google.com</strong> dans <span id="cdown" class="countdown">3</span>s...</p>' +
+      '</div>';
+
+    var timer = setInterval(function() {
+      countdown--;
+      var el = document.getElementById('cdown');
+      if (el) el.textContent = countdown;
+      if (countdown <= 0) {
+        clearInterval(timer);
+        // Redirection réelle vers Google (inoffensif)
+        window.location = 'https://www.google.com';
+      }
+    }, 1000);
+
+  } else {
+    // ===== CAS 2 : visite directe → page normale =====
+    document.getElementById('result').innerHTML =
+      '<div class="normal">' +
+      '<h2>✅ Visite directe — page normale</h2>' +
+      '<p>Param ?p= présent mais <strong>pas de referrer moteur</strong> → rien ne se passe.</p>' +
+      '<p>Le visiteur voit le site JIFSAN normalement. Le piège ne se déclenche PAS.</p>' +
+      '<p><em>→ Test avec referrer : ajoute <strong>&ref=google</strong> à l\'URL pour simuler un clic depuis Google</em></p>' +
+      '</div>';
+  }
+
+} else {
+  // Pas de paramètre ?p= → wcpt.js ne charge rien
+  document.getElementById('result').innerHTML =
+    '<div class="normal">' +
+    '<h2>⚪ Pas de paramètre ?p=</h2>' +
+    '<p>Le script wcpt.js ne s\'active pas. Page normale pour tout le monde.</p>' +
+    '<p><em>→ Ajoute <strong>?p=test</strong> à l\'URL pour activer le mécanisme</em></p>' +
+    '</div>';
+}
+</script>
+</body>
+</html>
